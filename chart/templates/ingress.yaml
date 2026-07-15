@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}-paperless
+  labels:
+    app: {{ .Release.Name }}
+    component: paperless
+spec:
+  rules:
+    - host: "{{ required "subdomain is required" .Values.subdomain }}.{{ .Values.baseDomain }}"
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ .Release.Name }}-paperless
+                port:
+                  number: 8000

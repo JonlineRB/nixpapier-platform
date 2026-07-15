@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-paperless
+  labels:
+    app: {{ .Release.Name }}
+    component: paperless
+spec:
+  selector:
+    app: {{ .Release.Name }}
+    component: paperless
+  ports:
+    - port: 8000
+      targetPort: 8000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-paperless
+  labels:
+    app: {{ .Release.Name }}
+    component: paperless
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      component: paperless
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        component: paperless
+    spec:
+      containers:
+        - name: paperless
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: PAPERLESS_REDIS
+              value: "redis://{{ .Release.Name }}-redis:6379"
+            - name: PAPERLESS_DBHOST
+              value: "{{ .Release.Name }}-postgres"
+            - name: PAPERLESS_DBNAME
+              value: {{ .Values.postgres.database | quote }}
+            - name: PAPERLESS_DBUSER
+              value: {{ .Values.postgres.user | quote }}
+            - name: PAPERLESS_DBPASS
+              value: {{ required "postgres.password must be set" .Values.postgres.password | quote }}
+            - name: PAPERLESS_URL
+              value: "https://{{ .Values.subdomain }}.{{ .Values.baseDomain }}"
+            - name: SEED_PROFILE
+              value: {{ .Values.seed.profile | quote }}
+            - name: PAPERLESS_ADMIN_USER
+              value: "admin"
+            - name: PAPERLESS_ADMIN_PASSWORD
+              value: {{ required "admin.password must be set via --set" .Values.admin.password | quote }}
+            - name: PAPERLESS_ADMIN_MAIL
+              value: {{ .Values.admin.email | quote }}
+            - name: PAPERLESS_TIME_ZONE
+              value: "Europe/Berlin"
+            - name: PAPERLESS_OCR_LANGUAGE
+              value: "deu+eng"
+          volumeMounts:
+            - name: media
+              mountPath: /usr/src/paperless/media
+            - name: data
+              mountPath: /usr/src/paperless/data
+          startupProbe:
+            httpGet:
+              path: /accounts/login/
+              port: 8000
+            failureThreshold: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /accounts/login/
+              port: 8000
+            periodSeconds: 15
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-media
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ .Release.Name }}-data

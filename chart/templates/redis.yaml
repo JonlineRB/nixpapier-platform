@@ -1,0 +1,41 @@
+{{- if .Values.redis.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    app: {{ .Release.Name }}
+    component: redis
+spec:
+  selector:
+    app: {{ .Release.Name }}
+    component: redis
+  ports:
+    - port: 6379
+      targetPort: 6379
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-redis
+  labels:
+    app: {{ .Release.Name }}
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ .Release.Name }}
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        component: redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+{{- end }}

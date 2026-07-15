@@ -1,0 +1,46 @@
+# ---- Image ----
+image:
+  repository: ghcr.io/<your-username>/paperless-nix
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+
+# ---- Per-tenant identity ----
+subdomain: ""              # e.g. "kunde1" -> kunde1.yourapp.de
+baseDomain: "localtest.me" # local testing default; prod overrides
+
+# ---- Seed profile ----
+seed:
+  profile: "none"          # none | gobd
+
+branding:
+  title: "NIXppr"
+
+# ---- Admin bootstrap ----
+admin:
+  email: ""
+  # password: injected via --set at install time, never committed
+
+# ---- Resources (autoscaler reads these) ----
+resources:
+  requests:
+    memory: "768Mi"
+    cpu: "250m"
+  limits:
+    memory: "1536Mi"
+    cpu: "1000m"
+
+# ---- Storage ----
+storage:
+  className: "local-path"  # k3s default locally; "hcloud-volumes" in prod
+  documents: "10Gi"
+  database: "5Gi"
+
+# ---- Postgres ----
+postgres:
+  user: "paperless"
+  database: "paperless"
+  # password injected via --set, never defaulted here
+
+# ---- Redis ----
+redis:
+  enabled: true
