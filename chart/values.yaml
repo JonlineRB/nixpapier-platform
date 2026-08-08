@@ -1,6 +1,6 @@
 # ---- Image ----
 image:
-  repository: ghcr.io/<your-username>/paperless-nix
+  repository: ghcr.io/jonlinerb/paperless-nix
   tag: "0.1.0"
   pullPolicy: IfNotPresent
 
