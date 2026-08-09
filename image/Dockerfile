@@ -1,4 +1,4 @@
-FROM ghcr.io/paperless-ngx/paperless-ngx:v3.0.5
+FROM ghcr.io/paperless-ngx/paperless-ngx:3.0.5
 
 COPY seeds/ /seeds/
 COPY branding/ /branding/
