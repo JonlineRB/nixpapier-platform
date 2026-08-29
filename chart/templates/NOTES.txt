@@ -1,1 +1,4 @@
 NIXppr instance {{ .Release.Name }} installed.
+
+To retrieve the admin password:
+  kubectl get secret {{ .Release.Name }}-secrets -n {{ .Release.Namespace }} -o jsonpath="{.data.admin-password}" | base64 -d && echo
