@@ -18,6 +18,32 @@ spec:
         app: {{ .Release.Name }}
         component: postgres
     spec:
+      {{- if .Values.restore.fromBackup }}
+      initContainers:
+        - name: restore-postgres
+          image: {{ .Values.backup.image }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              restic restore {{ .Values.restore.snapshot }} --tag postgres --target /restore-tmp \
+                -o sftp.command="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp" &&
+              cp /restore-tmp/tmp/dump.sql /initdb/dump.sql &&
+              echo "Postgres dump staged for restore."
+          env:
+            - name: RESTIC_REPOSITORY
+              value: {{ .Values.backup.repository | quote }}
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-restic-creds
+                  key: password
+          volumeMounts:
+            - name: initdb
+              mountPath: /initdb
+            - name: ssh-key
+              mountPath: /keys
+              readOnly: true
+      {{- end }}
       containers:
         - name: postgres
           image: postgres:16
@@ -31,13 +57,29 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                    name: {{ .Release.Name }}-secrets
-                    key: postgres-password
+                  name: {{ .Release.Name }}-secrets
+                  key: postgres-password
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            {{- if .Values.restore.fromBackup }}
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+            {{- end }}
+      {{- if .Values.restore.fromBackup }}
+      volumes:
+        - name: initdb
+          emptyDir: {}
+        - name: ssh-key
+          secret:
+            secretName: {{ .Release.Name }}-restic-creds
+            items:
+              - key: ssh-key
+                path: ssh-key
+                mode: 0600
+      {{- end }}
   volumeClaimTemplates:
     - metadata:
         name: data

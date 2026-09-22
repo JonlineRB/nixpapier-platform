@@ -19,6 +19,24 @@ branding:
 admin:
   email: ""
 
+# ---- Backups ----
+restore:
+  fromBackup: false
+  snapshot: "latest"
+
+backup:
+  enabled: false
+  image: ghcr.io/jonlinerb/nixpapier-backup-tools:0.1.0
+  schedule: "0 2 * * *" # 02:00 every day
+  repository: ""
+  sshHost: ""
+  sshPort: 23
+  sshUser: ""
+  retention:
+    daily: 7
+    weekly: 4
+    monthly: 12
+
 # ---- Resources (autoscaler reads these) ----
 resources:
   requests:

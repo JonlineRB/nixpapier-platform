@@ -34,6 +34,35 @@ spec:
         app: {{ .Release.Name }}
         component: paperless
     spec:
+      {{- if .Values.restore.fromBackup }}
+      initContainers:
+        - name: restore-media
+          image: {{ .Values.backup.image }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              if [ -f /usr/src/paperless/media/.restore-complete ]; then
+                echo "Media already restored, skipping.";
+              else
+                restic restore {{ .Values.restore.snapshot }} --tag media --target / \
+                  -o sftp.command="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp" &&
+                touch /usr/src/paperless/media/.restore-complete;
+              fi
+          env:
+            - name: RESTIC_REPOSITORY
+              value: {{ .Values.backup.repository | quote }}
+            - name: RESTIC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-restic-creds
+                  key: password
+          volumeMounts:
+            - name: media
+              mountPath: /usr/src/paperless/media
+            - name: ssh-key
+              mountPath: /keys
+              readOnly: true
+      {{- end }}
       containers:
         - name: paperless
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -94,3 +123,12 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: {{ .Release.Name }}-data
+        {{- if .Values.restore.fromBackup }}
+        - name: ssh-key
+          secret:
+            secretName: {{ .Release.Name }}-restic-creds
+            items:
+              - key: ssh-key
+                path: ssh-key
+                mode: 0600
+        {{- end }}

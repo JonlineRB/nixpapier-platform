@@ -1,0 +1,84 @@
+{{- if .Values.backup.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-backup
+  labels:
+    app: {{ .Release.Name }}
+    component: backup
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            app: {{ .Release.Name }}
+            component: backup
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backup
+              image: {{ .Values.backup.image }}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  set -euo pipefail
+                  export SFTP_CMD="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp"
+
+                  echo "[backup] dumping postgres..."
+                  pg_dump -h {{ .Release.Name }}-postgres -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} > /tmp/dump.sql
+
+                  echo "[backup] backing up postgres dump..."
+                  restic -o sftp.command="$SFTP_CMD" backup /tmp/dump.sql --tag postgres
+
+                  echo "[backup] backing up media..."
+                  restic -o sftp.command="$SFTP_CMD" backup /usr/src/paperless/media --tag media
+
+                  echo "[backup] pruning old snapshots..."
+                  restic -o sftp.command="$SFTP_CMD" forget --tag postgres \
+                    --keep-daily {{ .Values.backup.retention.daily }} \
+                    --keep-weekly {{ .Values.backup.retention.weekly }} \
+                    --keep-monthly {{ .Values.backup.retention.monthly }} --prune
+                  restic -o sftp.command="$SFTP_CMD" forget --tag media \
+                    --keep-daily {{ .Values.backup.retention.daily }} \
+                    --keep-weekly {{ .Values.backup.retention.weekly }} \
+                    --keep-monthly {{ .Values.backup.retention.monthly }} --prune
+
+                  echo "[backup] done."
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-secrets
+                      key: postgres-password
+                - name: RESTIC_REPOSITORY
+                  value: {{ .Values.backup.repository | quote }}
+                - name: RESTIC_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ .Release.Name }}-restic-creds
+                      key: password
+              volumeMounts:
+                - name: media
+                  mountPath: /usr/src/paperless/media
+                  readOnly: true
+                - name: ssh-key
+                  mountPath: /keys
+                  readOnly: true
+          volumes:
+            - name: media
+              persistentVolumeClaim:
+                claimName: {{ .Release.Name }}-media
+            - name: ssh-key
+              secret:
+                secretName: {{ .Release.Name }}-restic-creds
+                items:
+                  - key: ssh-key
+                    path: ssh-key
+                    mode: 0600
+{{- end }}
