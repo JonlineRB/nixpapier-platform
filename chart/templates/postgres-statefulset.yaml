@@ -25,18 +25,30 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              restic restore {{ .Values.restore.snapshot }} --tag postgres --target /restore-tmp \
-                -o sftp.command="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp" &&
-              cp /restore-tmp/tmp/dump.sql /initdb/dump.sql &&
+              set -e
+              {{- if .Values.backup.healthcheck.enabled }}
+              on_exit() {
+                rc=$?
+                if [ "$rc" -ne 0 ] && [ -n "${HC_RESTORE_UUID:-}" ]; then
+                  curl -fsS -m 10 --retry 3 "https://hc-ping.com/${HC_RESTORE_UUID}/fail" >/dev/null || true
+                fi
+              }
+              trap on_exit EXIT
+              {{- end }}
+              . /usr/local/bin/restic-env.sh
+              restic restore {{ .Values.restore.snapshot }} --tag postgres --target /restore-tmp
+              cp /restore-tmp/tmp/dump.sql /initdb/dump.sql
               echo "Postgres dump staged for restore."
           env:
-            - name: RESTIC_REPOSITORY
-              value: {{ .Values.backup.repository | quote }}
-            - name: RESTIC_PASSWORD
+            {{- include "nixpapier.backupEnv" . | nindent 12 }}
+            {{- if .Values.backup.healthcheck.enabled }}
+            - name: HC_RESTORE_UUID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-restic-creds
-                  key: password
+                  key: healthcheck-restore-uuid
+                  optional: true
+            {{- end }}
           volumeMounts:
             - name: initdb
               mountPath: /initdb

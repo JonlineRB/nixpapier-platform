@@ -60,3 +60,19 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
+
+{{- define "nixpapier.backupEnv" -}}
+- name: RESTIC_REPOSITORY
+  value: {{ .Values.backup.repository | quote }}
+- name: RESTIC_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ .Release.Name }}-restic-creds
+      key: password
+- name: BACKUP_SSH_HOST
+  value: {{ .Values.backup.sshHost | quote }}
+- name: BACKUP_SSH_USER
+  value: {{ .Values.backup.sshUser | quote }}
+- name: BACKUP_SSH_PORT
+  value: {{ .Values.backup.sshPort | quote }}
+{{- end }}

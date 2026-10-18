@@ -41,21 +41,33 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
+              set -e
+              {{- if .Values.backup.healthcheck.enabled }}
+              on_exit() {
+                rc=$?
+                if [ "$rc" -ne 0 ] && [ -n "${HC_RESTORE_UUID:-}" ]; then
+                  curl -fsS -m 10 --retry 3 "https://hc-ping.com/${HC_RESTORE_UUID}/fail" >/dev/null || true
+                fi
+              }
+              trap on_exit EXIT
+              {{- end }}
               if [ -f /usr/src/paperless/media/.restore-complete ]; then
-                echo "Media already restored, skipping.";
+                echo "Media already restored, skipping."
               else
-                restic restore {{ .Values.restore.snapshot }} --tag media --target / \
-                  -o sftp.command="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp" &&
-                touch /usr/src/paperless/media/.restore-complete;
+                . /usr/local/bin/restic-env.sh
+                restic restore {{ .Values.restore.snapshot }} --tag media --target /
+                touch /usr/src/paperless/media/.restore-complete
               fi
           env:
-            - name: RESTIC_REPOSITORY
-              value: {{ .Values.backup.repository | quote }}
-            - name: RESTIC_PASSWORD
+            {{- include "nixpapier.backupEnv" . | nindent 12 }}
+            {{- if .Values.backup.healthcheck.enabled }}
+            - name: HC_RESTORE_UUID
               valueFrom:
                 secretKeyRef:
                   name: {{ .Release.Name }}-restic-creds
-                  key: password
+                  key: healthcheck-restore-uuid
+                  optional: true
+            {{- end }}
           volumeMounts:
             - name: media
               mountPath: /usr/src/paperless/media

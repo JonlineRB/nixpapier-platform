@@ -27,42 +27,54 @@ spec:
               command: ["/bin/bash", "-c"]
               args:
                 - |
-                  set -euo pipefail
-                  export SFTP_CMD="ssh -p {{ .Values.backup.sshPort }} -i /keys/ssh-key -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ .Values.backup.sshUser }}@{{ .Values.backup.sshHost }} -s sftp"
+                  set -Eeuo pipefail
+
+                  {{- if .Values.backup.healthcheck.enabled }}
+                  HC_BASE="https://hc-ping.com/${HC_UUID}"
+                  notify_fail() { curl -fsS -m 10 --retry 3 "$HC_BASE/fail" >/dev/null || true; }
+                  trap notify_fail ERR
+                  curl -fsS -m 10 --retry 3 "$HC_BASE/start" >/dev/null || true
+                  {{- end }}
+
+                  . /usr/local/bin/restic-env.sh
 
                   echo "[backup] dumping postgres..."
                   pg_dump -h {{ .Release.Name }}-postgres -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} > /tmp/dump.sql
 
                   echo "[backup] backing up postgres dump..."
-                  restic -o sftp.command="$SFTP_CMD" backup /tmp/dump.sql --tag postgres
+                  restic backup /tmp/dump.sql --tag postgres
 
                   echo "[backup] backing up media..."
-                  restic -o sftp.command="$SFTP_CMD" backup /usr/src/paperless/media --tag media
+                  restic backup /usr/src/paperless/media --tag media
 
                   echo "[backup] pruning old snapshots..."
-                  restic -o sftp.command="$SFTP_CMD" forget --tag postgres \
+                  restic forget --tag postgres \
                     --keep-daily {{ .Values.backup.retention.daily }} \
                     --keep-weekly {{ .Values.backup.retention.weekly }} \
                     --keep-monthly {{ .Values.backup.retention.monthly }} --prune
-                  restic -o sftp.command="$SFTP_CMD" forget --tag media \
+                  restic forget --tag media \
                     --keep-daily {{ .Values.backup.retention.daily }} \
                     --keep-weekly {{ .Values.backup.retention.weekly }} \
                     --keep-monthly {{ .Values.backup.retention.monthly }} --prune
 
                   echo "[backup] done."
+                  {{- if .Values.backup.healthcheck.enabled }}
+                  curl -fsS -m 10 --retry 3 "$HC_BASE" >/dev/null || true
+                  {{- end }}
               env:
+                {{- include "nixpapier.backupEnv" . | nindent 16 }}
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Release.Name }}-secrets
                       key: postgres-password
-                - name: RESTIC_REPOSITORY
-                  value: {{ .Values.backup.repository | quote }}
-                - name: RESTIC_PASSWORD
+                {{- if .Values.backup.healthcheck.enabled }}
+                - name: HC_UUID
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Release.Name }}-restic-creds
-                      key: password
+                      key: healthcheck-uuid
+                {{- end }}
               volumeMounts:
                 - name: media
                   mountPath: /usr/src/paperless/media
