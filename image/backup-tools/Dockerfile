@@ -1,7 +1,8 @@
 FROM postgres:16
 
-COPY restic-env.sh /usr/local/bin/restic-env.sh
-RUN chmod +x /usr/local/bin/restic-env.sh && \
+COPY restic-env.sh hc.sh backup.sh restore-postgres.sh restore-media.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/restic-env.sh /usr/local/bin/hc.sh /usr/local/bin/backup.sh \
+             /usr/local/bin/restore-postgres.sh /usr/local/bin/restore-media.sh && \
 	apt-get update && \
     apt-get install -y --no-install-recommends curl bzip2 openssh-client ca-certificates && \
     curl -fsSL https://github.com/restic/restic/releases/download/v0.16.4/restic_0.16.4_linux_amd64.bz2 -o /tmp/restic.bz2 && \

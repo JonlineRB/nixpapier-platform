@@ -24,50 +24,26 @@ spec:
           containers:
             - name: backup
               image: {{ .Values.backup.image }}
-              command: ["/bin/bash", "-c"]
-              args:
-                - |
-                  set -Eeuo pipefail
-
-                  {{- if .Values.backup.healthcheck.enabled }}
-                  HC_BASE="https://hc-ping.com/${HC_UUID}"
-                  notify_fail() { curl -fsS -m 10 --retry 3 "$HC_BASE/fail" >/dev/null || true; }
-                  trap notify_fail ERR
-                  curl -fsS -m 10 --retry 3 "$HC_BASE/start" >/dev/null || true
-                  {{- end }}
-
-                  . /usr/local/bin/restic-env.sh
-
-                  echo "[backup] dumping postgres..."
-                  pg_dump -h {{ .Release.Name }}-postgres -U {{ .Values.postgres.user }} {{ .Values.postgres.database }} > /tmp/dump.sql
-
-                  echo "[backup] backing up postgres dump..."
-                  restic backup /tmp/dump.sql --tag postgres
-
-                  echo "[backup] backing up media..."
-                  restic backup /usr/src/paperless/media --tag media
-
-                  echo "[backup] pruning old snapshots..."
-                  restic forget --tag postgres \
-                    --keep-daily {{ .Values.backup.retention.daily }} \
-                    --keep-weekly {{ .Values.backup.retention.weekly }} \
-                    --keep-monthly {{ .Values.backup.retention.monthly }} --prune
-                  restic forget --tag media \
-                    --keep-daily {{ .Values.backup.retention.daily }} \
-                    --keep-weekly {{ .Values.backup.retention.weekly }} \
-                    --keep-monthly {{ .Values.backup.retention.monthly }} --prune
-
-                  echo "[backup] done."
-                  {{- if .Values.backup.healthcheck.enabled }}
-                  curl -fsS -m 10 --retry 3 "$HC_BASE" >/dev/null || true
-                  {{- end }}
+              command: ["/usr/local/bin/backup.sh"]
               env:
                 {{- include "nixpapier.backupEnv" . | nindent 16 }}
+                - name: PGHOST
+                  value: {{ .Release.Name }}-postgres
+                - name: PGUSER
+                  value: {{ .Values.postgres.user | quote }}
+                - name: PGDATABASE
+                  value: {{ .Values.postgres.database | quote }}
                 - name: PGPASSWORD
                   valueFrom:
                     secretKeyRef:
                       name: {{ .Release.Name }}-secrets
                       key: postgres-password
+                - name: KEEP_DAILY
+                  value: {{ .Values.backup.retention.daily | quote }}
+                - name: KEEP_WEEKLY
+                  value: {{ .Values.backup.retention.weekly | quote }}
+                - name: KEEP_MONTHLY
+                  value: {{ .Values.backup.retention.monthly | quote }}
                 {{- if .Values.backup.healthcheck.enabled }}
                 - name: HC_UUID
                   valueFrom:

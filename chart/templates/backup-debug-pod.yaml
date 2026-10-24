@@ -1,0 +1,41 @@
+{{- if .Values.backup.debugPod.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-backup-debug
+  labels:
+    app: {{ .Release.Name }}
+    component: backup-debug
+spec:
+  restartPolicy: Never
+  activeDeadlineSeconds: 7200
+  containers:
+    - name: debug
+      image: {{ .Values.backup.image }}
+      command: ["sleep", "infinity"]
+      env:
+        {{- include "nixpapier.backupEnv" . | nindent 8 }}
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Release.Name }}-secrets
+              key: postgres-password
+      volumeMounts:
+        - name: media
+          mountPath: /usr/src/paperless/media
+          readOnly: true
+        - name: ssh-key
+          mountPath: /keys
+          readOnly: true
+  volumes:
+    - name: media
+      persistentVolumeClaim:
+        claimName: {{ .Release.Name }}-media
+    - name: ssh-key
+      secret:
+        secretName: {{ .Release.Name }}-restic-creds
+        items:
+          - key: ssh-key
+            path: ssh-key
+            mode: 0600
+{{- end }}

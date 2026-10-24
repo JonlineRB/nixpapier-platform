@@ -22,25 +22,11 @@ spec:
       initContainers:
         - name: restore-postgres
           image: {{ .Values.backup.image }}
-          command: ["/bin/sh", "-c"]
-          args:
-            - |
-              set -e
-              {{- if .Values.backup.healthcheck.enabled }}
-              on_exit() {
-                rc=$?
-                if [ "$rc" -ne 0 ] && [ -n "${HC_RESTORE_UUID:-}" ]; then
-                  curl -fsS -m 10 --retry 3 "https://hc-ping.com/${HC_RESTORE_UUID}/fail" >/dev/null || true
-                fi
-              }
-              trap on_exit EXIT
-              {{- end }}
-              . /usr/local/bin/restic-env.sh
-              restic restore {{ .Values.restore.snapshot }} --tag postgres --target /restore-tmp
-              cp /restore-tmp/tmp/dump.sql /initdb/dump.sql
-              echo "Postgres dump staged for restore."
+          command: ["/usr/local/bin/restore-postgres.sh"]
           env:
             {{- include "nixpapier.backupEnv" . | nindent 12 }}
+            - name: RESTORE_SNAPSHOT
+              value: {{ .Values.restore.snapshot | quote }}
             {{- if .Values.backup.healthcheck.enabled }}
             - name: HC_RESTORE_UUID
               valueFrom:
