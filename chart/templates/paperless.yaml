@@ -65,6 +65,13 @@ spec:
           ports:
             - containerPort: 8000
           env:
+            - name: PAPERLESS_DBENGINE
+              value: "postgresql"
+            - name: PAPERLESS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: secret-key
             - name: PAPERLESS_REDIS
               value: "redis://{{ .Release.Name }}-redis:6379"
             - name: PAPERLESS_DBHOST
