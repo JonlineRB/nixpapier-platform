@@ -1,0 +1,22 @@
+#cloud-config
+users:
+  - name: jb
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDSmHVmS3PPWE34OdJBfS0T0mlCPzBMRk/LBTIFiE9AR nixppr-server-admin
+disable_root: true
+ssh_pwauth: false
+package_update: true
+package_upgrade: true
+packages: [unattended-upgrades, curl, ca-certificates]
+write_files:
+  - path: /etc/ssh/sshd_config.d/99-hardening.conf
+    content: |
+      PasswordAuthentication no
+      PermitRootLogin no
+      KbdInteractiveAuthentication no
+runcmd:
+  - systemctl restart ssh
