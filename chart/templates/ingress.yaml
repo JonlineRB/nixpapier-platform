@@ -5,7 +5,17 @@ metadata:
   labels:
     app: {{ .Release.Name }}
     component: paperless
+  {{- if .Values.tls.enabled }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.tls.clusterIssuer | quote }}
+  {{- end }}
 spec:
+  {{- if .Values.tls.enabled }}
+  tls:
+    - hosts:
+        - "{{ required "subdomain is required" .Values.subdomain }}.{{ .Values.baseDomain }}"
+      secretName: {{ .Release.Name }}-tls
+  {{- end }}
   rules:
     - host: "{{ required "subdomain is required" .Values.subdomain }}.{{ .Values.baseDomain }}"
       http:

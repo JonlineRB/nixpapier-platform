@@ -64,3 +64,8 @@ postgres:
 # ---- Redis ----
 redis:
   enabled: true
+
+# ---- TLS ----
+tls:
+  enabled: false
+  clusterIssuer: letsencrypt-staging

@@ -20,3 +20,4 @@ write_files:
       KbdInteractiveAuthentication no
 runcmd:
   - systemctl restart ssh
+  - curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION=v1.37.2+k3s1 sh -
