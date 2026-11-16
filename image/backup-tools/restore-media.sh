@@ -20,3 +20,4 @@ fi
 echo "[restore-media] restoring snapshot '$SNAPSHOT' (tag media)..."
 restic restore "$SNAPSHOT" --tag media --target /
 touch "$MARKER"
+hc_ping

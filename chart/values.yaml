@@ -26,7 +26,7 @@ restore:
 
 backup:
   enabled: false
-  image: ghcr.io/jonlinerb/nixpapier-backup-tools:0.4.1
+  image: ghcr.io/jonlinerb/nixpapier-backup-tools:0.4.2
   schedule: "0 2 * * *" # 02:00 every day
   repository: ""
   sshHost: ""

@@ -15,3 +15,4 @@ echo "[restore-postgres] restoring snapshot '$SNAPSHOT' (tag postgres)..."
 restic restore "$SNAPSHOT" --tag postgres --target "$TMP"
 cp "${TMP}${DUMP_PATH}" "${STAGE_DIR}/dump.sql"
 echo "Postgres dump staged for restore."
+hc_ping
